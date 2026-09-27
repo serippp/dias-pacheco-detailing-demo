@@ -6,7 +6,10 @@ const navigation = document.querySelector('.main-nav');
 const preloader = document.querySelector('.preloader');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const videos = [...document.querySelectorAll('video[autoplay]')];
+const heroVideo = document.querySelector('.hero-video');
 let lockedScrollY = 0;
+let heroRetryCount = 0;
+let heroRetryTimer;
 
 const finishLoading = () => {
   if (!preloader || preloader.classList.contains('is-hidden')) return;
@@ -21,15 +24,40 @@ const attemptPlayback = async (video) => {
   video.muted = true;
   video.defaultMuted = true;
   video.playsInline = true;
+  video.autoplay = true;
+  video.loop = true;
+  video.controls = false;
   video.setAttribute('muted', '');
+  video.setAttribute('autoplay', '');
+  video.setAttribute('loop', '');
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
+  video.removeAttribute('controls');
+
+  if (video === heroVideo) {
+    video.disablePictureInPicture = true;
+    video.setAttribute('disablepictureinpicture', '');
+    video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+    video.setAttribute('x-webkit-airplay', 'deny');
+  }
 
   try {
     const attempt = video.play();
     if (attempt) await attempt;
     video.parentElement?.classList.remove('playback-failed');
+    if (video === heroVideo) {
+      heroRetryCount = 0;
+      window.clearTimeout(heroRetryTimer);
+    }
   } catch {
+    if (video === heroVideo && heroRetryCount < 3) {
+      const retryDelays = [180, 650, 1400];
+      window.clearTimeout(heroRetryTimer);
+      heroRetryTimer = window.setTimeout(() => attemptPlayback(video), retryDelays[heroRetryCount]);
+      heroRetryCount += 1;
+      return;
+    }
+
     video.parentElement?.classList.add('playback-failed');
     const holdFirstFrame = () => {
       try {
@@ -46,9 +74,18 @@ const attemptPlayback = async (video) => {
 const startVideos = () => videos.forEach(attemptPlayback);
 document.addEventListener('DOMContentLoaded', startVideos, { once: true });
 window.addEventListener('load', startVideos, { once: true });
+window.addEventListener('pageshow', () => {
+  if (heroVideo?.paused) attemptPlayback(heroVideo);
+});
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) videos.filter((video) => video.paused).forEach(attemptPlayback);
 });
+heroVideo?.addEventListener('loadeddata', () => {
+  if (heroVideo.paused) attemptPlayback(heroVideo);
+}, { once: true });
+heroVideo?.addEventListener('canplay', () => {
+  if (heroVideo.paused) attemptPlayback(heroVideo);
+}, { once: true });
 videos.forEach((video) => {
   video.addEventListener('playing', () => video.parentElement?.classList.remove('playback-failed'));
   video.addEventListener('error', () => video.parentElement?.classList.add('playback-failed'));
