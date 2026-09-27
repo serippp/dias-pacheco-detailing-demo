@@ -68,13 +68,13 @@ summary::-webkit-details-marker { display: none; }
 .menu-toggle[aria-expanded="true"] span:last-child { top: 1.48rem; transform: rotate(-45deg); }
 
 .hero { position: relative; min-height: 47rem; height: 100svh; max-height: 70rem; display: grid; align-items: center; overflow: hidden; background: var(--ink); }
-.hero-video-wrap { position: absolute; inset: 0 0 0 43%; overflow: hidden; border-left: 1px solid var(--line); background: linear-gradient(135deg, #1b1812, #080705); }
-.hero-video { width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; -webkit-user-select: none; user-select: none; filter: saturate(.78) contrast(1.08) brightness(.82); }
+.hero-video-wrap { position: absolute; inset: 0 0 0 43%; overflow: hidden; border-left: 1px solid var(--line); background: #080705 url("assets/video/hero-fallback.jpg") center / cover no-repeat; }
+.hero-video { width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; -webkit-user-select: none; user-select: none; filter: saturate(.78) contrast(1.08) brightness(.82); opacity: 1; transition: opacity .2s ease; }
 .hero-video::-webkit-media-controls { display: none !important; -webkit-appearance: none; opacity: 0; pointer-events: none; }
 .hero-video::-webkit-media-controls-enclosure { display: none !important; -webkit-appearance: none; opacity: 0; pointer-events: none; }
 .hero-video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; opacity: 0; pointer-events: none; }
 .hero-video::-webkit-media-controls-overlay-play-button { display: none !important; -webkit-appearance: none; opacity: 0; pointer-events: none; }
-.hero-video-wrap.playback-failed .hero-video { filter: saturate(.6) contrast(1.1) brightness(.6); }
+.hero-video-wrap.playback-failed .hero-video { opacity: 0; }
 .hero-veil { position: absolute; inset: 0; background: linear-gradient(90deg, var(--ink) 0 42%, rgba(8,7,5,.74) 57%, rgba(8,7,5,.16) 83%), linear-gradient(0deg, rgba(8,7,5,.68), transparent 45%); }
 .hero-lines { position: absolute; inset: 0; opacity: .26; background-image: linear-gradient(var(--line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--line-soft) 1px, transparent 1px); background-size: 10rem 10rem; mask-image: linear-gradient(90deg, #000 0, transparent 70%); }
 .hero-inner { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) 11rem; align-items: end; gap: 3rem; padding-top: var(--header); }

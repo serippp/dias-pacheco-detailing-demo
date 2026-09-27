@@ -59,6 +59,8 @@ const attemptPlayback = async (video) => {
     }
 
     video.parentElement?.classList.add('playback-failed');
+    if (video === heroVideo) return;
+
     const holdFirstFrame = () => {
       try {
         video.currentTime = Math.min(.05, Number.isFinite(video.duration) ? video.duration : .05);
@@ -75,10 +77,10 @@ const startVideos = () => videos.forEach(attemptPlayback);
 document.addEventListener('DOMContentLoaded', startVideos, { once: true });
 window.addEventListener('load', startVideos, { once: true });
 window.addEventListener('pageshow', () => {
-  if (heroVideo?.paused) attemptPlayback(heroVideo);
+  if (heroVideo) attemptPlayback(heroVideo);
 });
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) videos.filter((video) => video.paused).forEach(attemptPlayback);
+  if (document.visibilityState === 'visible') videos.filter((video) => video.paused).forEach(attemptPlayback);
 });
 heroVideo?.addEventListener('loadeddata', () => {
   if (heroVideo.paused) attemptPlayback(heroVideo);
