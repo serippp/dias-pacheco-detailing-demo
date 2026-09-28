@@ -7,9 +7,14 @@ const preloader = document.querySelector('.preloader');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const videos = [...document.querySelectorAll('video[autoplay]')];
 const heroVideo = document.querySelector('.hero-video');
+const secondaryVideo = document.querySelector('.secondary-video');
 let lockedScrollY = 0;
 let heroRetryCount = 0;
 let heroRetryTimer;
+let secondaryRetryCount = 0;
+let secondaryRetryTimer;
+let secondaryVideoPrepared = false;
+let secondaryVideoIsNear = false;
 
 const finishLoading = () => {
   if (!preloader || preloader.classList.contains('is-hidden')) return;
@@ -21,6 +26,8 @@ window.addEventListener('load', () => window.setTimeout(finishLoading, reducedMo
 window.setTimeout(finishLoading, 2400);
 
 const attemptPlayback = async (video) => {
+  if (!video) return;
+
   video.muted = true;
   video.defaultMuted = true;
   video.playsInline = true;
@@ -34,53 +41,52 @@ const attemptPlayback = async (video) => {
   video.setAttribute('webkit-playsinline', '');
   video.removeAttribute('controls');
 
-  if (video === heroVideo) {
-    video.disablePictureInPicture = true;
-    video.setAttribute('disablepictureinpicture', '');
-    video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
-    video.setAttribute('x-webkit-airplay', 'deny');
-  }
+  video.disablePictureInPicture = true;
+  video.setAttribute('disablepictureinpicture', '');
+  video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+  video.setAttribute('x-webkit-airplay', 'deny');
 
   try {
     const attempt = video.play();
     if (attempt) await attempt;
     video.parentElement?.classList.remove('playback-failed');
+    video.parentElement?.classList.add('is-playing');
     if (video === heroVideo) {
       heroRetryCount = 0;
       window.clearTimeout(heroRetryTimer);
+    } else if (video === secondaryVideo) {
+      secondaryRetryCount = 0;
+      window.clearTimeout(secondaryRetryTimer);
     }
   } catch {
-    if (video === heroVideo && heroRetryCount < 3) {
-      const retryDelays = [180, 650, 1400];
+    const retryDelays = [180, 650, 1400];
+    if (video === heroVideo && heroRetryCount < retryDelays.length) {
       window.clearTimeout(heroRetryTimer);
-      heroRetryTimer = window.setTimeout(() => attemptPlayback(video), retryDelays[heroRetryCount]);
-      heroRetryCount += 1;
+      heroRetryTimer = window.setTimeout(() => attemptPlayback(video), retryDelays[heroRetryCount++]);
+      return;
+    }
+    if (video === secondaryVideo && secondaryVideoIsNear && secondaryRetryCount < retryDelays.length) {
+      window.clearTimeout(secondaryRetryTimer);
+      secondaryRetryTimer = window.setTimeout(() => attemptPlayback(video), retryDelays[secondaryRetryCount++]);
       return;
     }
 
     video.parentElement?.classList.add('playback-failed');
-    if (video === heroVideo) return;
-
-    const holdFirstFrame = () => {
-      try {
-        video.currentTime = Math.min(.05, Number.isFinite(video.duration) ? video.duration : .05);
-      } catch {
-        // O fundo escuro do contentor mantém o fallback limpo se o seek for bloqueado.
-      }
-    };
-    if (video.readyState >= 1) holdFirstFrame();
-    else video.addEventListener('loadedmetadata', holdFirstFrame, { once: true });
+    video.parentElement?.classList.remove('is-playing');
   }
 };
 
-const startVideos = () => videos.forEach(attemptPlayback);
-document.addEventListener('DOMContentLoaded', startVideos, { once: true });
-window.addEventListener('load', startVideos, { once: true });
+const startHeroVideo = () => attemptPlayback(heroVideo);
+document.addEventListener('DOMContentLoaded', startHeroVideo, { once: true });
+window.addEventListener('load', startHeroVideo, { once: true });
 window.addEventListener('pageshow', () => {
-  if (heroVideo) attemptPlayback(heroVideo);
+  attemptPlayback(heroVideo);
+  if (secondaryVideoIsNear && secondaryVideoPrepared) attemptPlayback(secondaryVideo);
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') videos.filter((video) => video.paused).forEach(attemptPlayback);
+  if (document.visibilityState !== 'visible') return;
+  if (heroVideo?.paused) attemptPlayback(heroVideo);
+  if (secondaryVideoIsNear && secondaryVideoPrepared && secondaryVideo?.paused) attemptPlayback(secondaryVideo);
 });
 heroVideo?.addEventListener('loadeddata', () => {
   if (heroVideo.paused) attemptPlayback(heroVideo);
@@ -89,9 +95,46 @@ heroVideo?.addEventListener('canplay', () => {
   if (heroVideo.paused) attemptPlayback(heroVideo);
 }, { once: true });
 videos.forEach((video) => {
-  video.addEventListener('playing', () => video.parentElement?.classList.remove('playback-failed'));
-  video.addEventListener('error', () => video.parentElement?.classList.add('playback-failed'));
+  video.addEventListener('playing', () => {
+    video.parentElement?.classList.remove('playback-failed');
+    video.parentElement?.classList.add('is-playing');
+  });
+  video.addEventListener('error', () => {
+    video.parentElement?.classList.add('playback-failed');
+    video.parentElement?.classList.remove('is-playing');
+  });
 });
+
+const prepareSecondaryVideo = () => {
+  if (!secondaryVideo || secondaryVideoPrepared) return;
+  const source = secondaryVideo.querySelector('source[data-src]');
+  if (!source) return;
+  source.src = source.dataset.src;
+  source.removeAttribute('data-src');
+  secondaryVideoPrepared = true;
+  secondaryVideo.load();
+  secondaryVideo.addEventListener('canplay', () => {
+    if (secondaryVideoIsNear) attemptPlayback(secondaryVideo);
+  }, { once: true });
+};
+
+if (secondaryVideo) {
+  if ('IntersectionObserver' in window) {
+    const secondaryVideoObserver = new IntersectionObserver(([entry]) => {
+      secondaryVideoIsNear = entry.isIntersecting;
+      if (secondaryVideoIsNear) {
+        prepareSecondaryVideo();
+        if (secondaryVideoPrepared && secondaryVideo.readyState >= 2) attemptPlayback(secondaryVideo);
+      } else if (secondaryVideoPrepared && !secondaryVideo.paused) {
+        secondaryVideo.pause();
+      }
+    }, { rootMargin: '600px 0px', threshold: 0.01 });
+    secondaryVideoObserver.observe(secondaryVideo.parentElement);
+  } else {
+    secondaryVideoIsNear = true;
+    prepareSecondaryVideo();
+  }
+}
 
 const updateHeader = () => header?.classList.toggle('scrolled', window.scrollY > 24);
 updateHeader();
